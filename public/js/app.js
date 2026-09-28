@@ -328,6 +328,148 @@ window.closeProfileModal = () => { document.getElementById('profile-modal').clas
 window.viewFriendProfileModal = async ()=>{ if(activeChat === 'global_group') return; showL(); try { let uD = await getDoc(doc(db,"users",activeChat)); if(uD.exists()){ let dat = uD.data(); document.getElementById('modal-uname').innerText = dat.fullName || activeChat; document.getElementById('modal-bio').innerText = dat.bio || ''; if(dat.isPrivate) { document.getElementById('modal-stats-area').style.display = 'none'; document.getElementById('modal-private-msg').style.display = 'block'; } else { document.getElementById('modal-stats-area').style.display = 'block'; document.getElementById('modal-private-msg').style.display = 'none'; let d=await getDocs(query(collection(db,"simulations"),where("username","==",activeChat))); let max=0, c=0, sum=0; let fSims = []; d.forEach(x=>{ let data = x.data(); c++; if(data.score>max) max=data.score; sum+=data.score; fSims.push(data); }); fSims.sort((a,b) => b.timestamp - a.timestamp); let avg = c>0 ? Math.round(sum/c) : 0; document.getElementById('modal-count').innerText = c; document.getElementById('modal-avg').innerText = avg; document.getElementById('modal-max').innerText = max; let histUl = document.getElementById('modal-history'); histUl.innerHTML = ''; if(c > 0) { fSims.slice(0, 5).forEach(s => { histUl.innerHTML += `<li class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-3 rounded-xl text-sm mb-2"><span class="text-gray-500">${s.date}</span> <span class="font-bold">${s.simName}</span> <b class="text-brand-600 text-lg">${s.score}</b></li>`; }); } else { histUl.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">טרם ביצע תחקירים.</li>'; } } } document.getElementById('modal-av').innerText = activeChat.charAt(0).toUpperCase(); document.getElementById('profile-modal').classList.remove('hidden'); } catch(e){ console.error(e); } hideL(); };
 
 async function loadArena(){ showL(); let tb=document.getElementById('arena-tbody'); tb.innerHTML=''; try { let ud=await getDocs(collection(db,"users")), priv=new Set(); let nameMap = {}; ud.forEach(x=>{ let d = x.data(); if(d.isPrivate) priv.add(x.id); nameMap[x.id] = d.fullName || x.id; }); let sd=await getDocs(collection(db,"simulations")), ag={}; sd.forEach(x=>{let s=x.data(); let un=s.username; if(priv.has(un))return; if(!ag[un])ag[un]={s:0,c:0,m:0}; ag[un].s+=s.score; ag[un].c++; if(s.score>ag[un].m)ag[un].m=s.score;}); let ra=Object.keys(ag).map(k=>({u:k, n:nameMap[k], a:Math.round(ag[k].s/ag[k].c), m:ag[k].m})).sort((a,b)=>b.a-a.a); ra.slice(0,20).forEach((u,i)=>tb.innerHTML+=`<tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition"><td class="py-4 px-4">${i<3?`<i class="fa-solid fa-medal text-${i===0?'yellow-500':i===1?'gray-400':'orange-400'} text-3xl drop-shadow"></i>`:`<span class="text-xl font-bold text-gray-400">#${i+1}</span>`}</td><td class="py-4 px-4 font-bold text-black dark:text-white text-lg">${u.n} <span class="text-sm font-normal text-gray-400 block">@${u.u}</span> ${u.u===window.currentUser?'<span class="text-xs bg-brand-100 text-brand-700 px-2 py-1 rounded-md font-bold mt-1 inline-block">זה אתה</span>':''}</td><td class="py-4 px-4 font-black text-brand-600 text-center text-3xl">${u.a}</td><td class="py-4 px-4 text-gray-500 font-bold text-center text-xl">${u.m}</td></tr>`); } catch(e){console.error(e);} hideL(); }
+// ================= MATH GAME LOGIC & ARENA TABS =================
+let mathInterval = null;
+let mathTime = 60;
+let mathScore = 0;
+let expectedAnswer = 0;
 
+window.switchArenaTab = (tab) => {
+    document.getElementById('tab-arena-lead').className = `flex-1 py-3 text-lg transition whitespace-nowrap ${tab==='leaderboard'?'tab-active':'tab-inactive'}`;
+    document.getElementById('tab-arena-games').className = `flex-1 py-3 text-lg transition whitespace-nowrap ${tab==='games'?'tab-active':'tab-inactive'}`;
+    
+    document.getElementById('arena-leaderboard-view').style.display = tab==='leaderboard' ? 'block' : 'none';
+    document.getElementById('arena-games-view').style.display = tab==='games' ? 'block' : 'none';
+    
+    if(tab === 'games') updateDailyUI();
+};
+
+function updateDailyUI() {
+    if(!uData) return;
+    let todayStr = new Date().toLocaleDateString('he');
+    // איפוס יומי במידת הצורך
+    if(uData.lastPlayedDate !== todayStr) {
+        uData.dailyPoints = 0;
+        setDoc(doc(db,"users",window.currentUser), { dailyPoints: 0, lastPlayedDate: todayStr }, {merge:true});
+    }
+    
+    let xp = uData.xp || 0;
+    let daily = uData.dailyPoints || 0;
+    document.getElementById('math-daily-points').innerText = daily;
+    document.getElementById('math-daily-prog').style.width = Math.min((daily / 100) * 100, 100) + '%';
+}
+
+window.startMathGame = (mode) => {
+    if(mode === 'solo') {
+        document.getElementById('math-menu').classList.add('hidden');
+        document.getElementById('math-active-game').classList.remove('hidden');
+        mathScore = 0;
+        mathTime = 60;
+        document.getElementById('math-score-ui').innerText = mathScore;
+        document.getElementById('math-timer-ui').innerText = mathTime;
+        document.getElementById('math-answer-input').value = '';
+        document.getElementById('math-answer-input').focus();
+        
+        generateMathQuestion();
+        
+        if(mathInterval) clearInterval(mathInterval);
+        mathInterval = setInterval(() => {
+            mathTime--;
+            document.getElementById('math-timer-ui').innerText = mathTime;
+            if(mathTime <= 0) window.endMathGame();
+        }, 1000);
+    }
+};
+
+window.showMultiplayerLobby = () => {
+    alert("תשתית המולטיפלייר לייב מוכנה! הפיצ'ר ייפתח בעדכון הבא לאחר סיום בדיקות עומס מול Firestore.");
+};
+
+function generateMathQuestion() {
+    let isDiv = Math.random() > 0.5;
+    let a = Math.floor(Math.random() * 10) + 1;
+    let b = Math.floor(Math.random() * 10) + 1;
+    
+    if(isDiv) {
+        let c = a * b;
+        expectedAnswer = b;
+        document.getElementById('math-question-ui').innerText = `${c} ÷ ${a}`;
+    } else {
+        expectedAnswer = a * b;
+        document.getElementById('math-question-ui').innerText = `${a} × ${b}`;
+    }
+}
+
+window.checkMathAnswer = () => {
+    let inp = document.getElementById('math-answer-input');
+    if(parseInt(inp.value) === expectedAnswer) {
+        // תשובה נכונה!
+        mathScore += 10;
+        document.getElementById('math-score-ui').innerText = mathScore;
+        inp.value = '';
+        generateMathQuestion();
+        
+        // אנימציה קטנה של הצלחה
+        let qUi = document.getElementById('math-question-ui');
+        qUi.classList.add('text-green-500');
+        setTimeout(() => qUi.classList.remove('text-green-500'), 200);
+    }
+};
+
+window.endMathGame = async () => {
+    clearInterval(mathInterval);
+    document.getElementById('math-active-game').classList.add('hidden');
+    document.getElementById('math-menu').classList.remove('hidden');
+    
+    if(mathScore > 0) {
+        alert(`כל הכבוד! צברת ${mathScore} נקודות ניסיון (XP).`);
+        let currentXP = uData.xp || 0;
+        let currentDaily = uData.dailyPoints || 0;
+        
+        await setDoc(doc(db,"users",window.currentUser), {
+            xp: currentXP + mathScore,
+            dailyPoints: currentDaily + mathScore,
+            lastPlayedDate: new Date().toLocaleDateString('he')
+        }, {merge:true});
+        
+        updateDailyUI();
+    }
+};
+
+// --- שדרוג האלגוריתם של הלידרבורד המקורי (יש להחליף את פונקציית loadArena הקיימת) ---
+window.loadArena = async function() {
+    showL(); 
+    let tb=document.getElementById('arena-tbody'); tb.innerHTML='';
+    try {
+        let ud=await getDocs(collection(db,"users")), priv=new Set(), userStats={};
+        ud.forEach(x => {
+            let d = x.data();
+            if(d.isPrivate) priv.add(x.id);
+            userStats[x.id] = { n: d.fullName || x.id, xp: d.xp || 0 };
+        });
+        
+        let sd=await getDocs(collection(db,"simulations")), ag={};
+        sd.forEach(x => {
+            let s=x.data(); let un=s.username; 
+            if(priv.has(un)) return; 
+            if(!ag[un]) ag[un] = { s:0, c:0 }; 
+            ag[un].s += s.score; 
+            ag[un].c++; 
+        });
+        
+        // חישוב ציון משוקלל לדירוג: ממוצע סימולציות + בונוס מהמשחקים (כל 100 XP שווים נקודה בדירוג)
+        let ra = Object.keys(userStats).map(k => {
+            let avgScore = ag[k] ? Math.round(ag[k].s / ag[k].c) : 0;
+            let xpBonus = Math.floor((userStats[k].xp) / 100);
+            let combinedScore = avgScore > 0 ? avgScore + xpBonus : xpBonus; // אם אין סימולציות, הדירוג הוא רק מ-XP
+            return { u:k, n:userStats[k].n, xp:userStats[k].xp, score: combinedScore };
+        }).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
+        
+        ra.slice(0,20).forEach((u,i) => {
+            tb.innerHTML += `<tr class="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition"><td class="py-4 px-4">${i<3?`<i class="fa-solid fa-medal text-${i===0?'yellow-500':i===1?'gray-400':'orange-400'} text-3xl drop-shadow"></i>`:`<span class="text-xl font-bold text-gray-400">#${i+1}</span>`}</td><td class="py-4 px-4 font-bold text-black dark:text-white text-lg">${u.n} <span class="text-sm font-normal text-gray-400 block">@${u.u}</span> ${u.u===window.currentUser?'<span class="text-xs bg-brand-100 text-brand-700 px-2 py-1 rounded-md font-bold mt-1 inline-block">זה אתה</span>':''}</td><td class="py-4 px-4 font-black text-brand-600 text-center text-3xl">${u.score}</td><td class="py-4 px-4 text-purple-500 font-bold text-center text-xl"><i class="fa-solid fa-star text-sm"></i> ${u.xp}</td></tr>`;
+        });
+    } catch(e) { console.error(e); }
+    hideL();
+}
 window.updateSettings = async (t, v)=>{ if(t==='priv'){ uData.isPrivate=v; await setDoc(doc(db,"users",window.currentUser),{isPrivate:v},{merge:true}); } if(t==='theme'){ document.documentElement.setAttribute('data-theme',v); localStorage.setItem('pTheme',v); } if(t==='font'){ document.documentElement.style.setProperty('--base-size', v+'px'); localStorage.setItem('pFont',v); } };
 window.saveProfileInfo = async () => { let fn = document.getElementById('prof-fullname').value.trim(); let bio = document.getElementById('prof-bio').value.trim(); await setDoc(doc(db,"users",window.currentUser),{fullName:fn, bio:bio},{merge:true}); };
