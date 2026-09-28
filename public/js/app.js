@@ -61,7 +61,7 @@ window.onload = async () => {
     document.documentElement.style.setProperty('--base-size', fs+'px');
     
     const sv = localStorage.getItem('psychoUser');
-    if(sv) { window.currentUser = sv; await setupLiveUser(); window.navigate('dashboard'); }
+    if(sv) { window.currentUser = sv; await setupLiveUser(); window.navigate('dashboard'); } if(mathInterval) window.endMathGame(); // עצירת משחק פעיל בעת נטישת העמוד
     else document.getElementById('auth-page').classList.remove('hidden');
 };
 
