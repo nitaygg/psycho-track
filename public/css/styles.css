@@ -1,0 +1,41 @@
+:root {
+    --b50: #eef2ff; --b100: #e0e7ff; --b500: #6366f1; --b600: #4f46e5; --b800: #3730a3;
+    --base-size: 16px;
+}
+[data-theme="emerald"] { --b50: #ecfdf5; --b100: #d1fae5; --b500: #10b981; --b600: #059669; --b800: #065f46; }
+[data-theme="rose"] { --b50: #fff1f2; --b100: #ffe4e6; --b500: #f43f5e; --b600: #e11d48; --b800: #9f1239; }
+[data-theme="dark"] { --b50: #1e293b; --b100: #334155; --b500: #94a3b8; --b600: #64748b; --b800: #0f172a; }
+
+body { font-family: 'Rubik', sans-serif; background-color: #f8fafc; color: #1e293b; font-size: var(--base-size); transition: all 0.3s; }
+[data-theme="dark"] body { background-color: #0f172a; color: #f8fafc; }
+
+.dark-card { background-color: #ffffff; }
+[data-theme="dark"] .dark-card { background-color: #1e293b; border-color: #334155; color: #f8fafc; }
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #0f172a; color: white; border-color: #334155; }
+
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.tab-active { border-bottom: 3px solid var(--b600); color: var(--b600); font-weight: 800; background-color: var(--b50); }
+.tab-inactive { color: #64748b; border-bottom: 3px solid transparent; font-weight: 600; }
+.tab-inactive:hover { color: var(--b600); background-color: var(--b50); }
+
+.progress-bg { background-color: #e2e8f0; border-radius: 9999px; height: 8px; width: 100%; }
+.progress-fill { background-color: var(--b600); height: 100%; transition: width 0.3s; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+#loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
+[data-theme="dark"] #loader { background: rgba(15,23,42,0.9); }
+
+.chat-bubble-me { background-color: var(--b500); color: white; border-radius: 16px 16px 0 16px; align-self: flex-end; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.chat-bubble-friend { background-color: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; border-radius: 16px 16px 16px 0; align-self: flex-start; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+[data-theme="dark"] .chat-bubble-friend { background-color: #334155; border-color: #475569; color: #f8fafc; }
+
+.chat-bg { background-image: url('https://www.transparenttextures.com/patterns/cubes.png'); background-color: #f8fafc; }
+[data-theme="dark"] .chat-bg { background-color: #0f172a; opacity: 0.9; }
+
+.timer-circle { width: 250px; height: 250px; border-radius: 50%; border: 12px solid var(--b100); display: flex; justify-content: center; align-items: center; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
+.timer-circle.warning { border-color: #ef4444; animation: pulse 1s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
