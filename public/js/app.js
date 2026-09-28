@@ -382,7 +382,164 @@ window.startMathGame = (mode) => {
 };
 
 window.showMultiplayerLobby = () => {
-    alert("תשתית המולטיפלייר לייב מוכנה! הפיצ'ר ייפתח בעדכון הבא לאחר סיום בדיקות עומס מול Firestore.");
+  // ================= MULTIPLAYER GAME LOGIC =================
+let multiGameId = null;
+let isPlayer1 = false;
+let multiUnsub = null;
+let multiTimerInt = null;
+let multiExpectedAnswer = 0;
+let myMultiScore = 0;
+
+window.showMultiplayerLobby = async () => {
+    document.getElementById('math-menu').classList.add('hidden');
+    document.getElementById('multi-lobby-ui').classList.remove('hidden');
+    
+    try {
+        // מחפשים חדר פנוי שממתין לשחקן
+        let q = query(collection(db, "games"), where("status", "==", "waiting"));
+        let snap = await getDocs(q);
+        
+        if (!snap.empty) {
+            // מצאנו חדר! מצטרפים כשחקן 2
+            let gameDoc = snap.docs[0];
+            multiGameId = gameDoc.id;
+            isPlayer1 = false;
+            await setDoc(doc(db, "games", multiGameId), { p2: uData.fullName || window.currentUser, status: "playing" }, {merge: true});
+            listenToMultiGame(multiGameId);
+        } else {
+            // לא מצאנו חדר - פותחים אחד חדש כשחקן 1
+            let newGame = await addDoc(collection(db, "games"), {
+                p1: uData.fullName || window.currentUser, p2: "ממתין...", p1Score: 0, p2Score: 0, status: "waiting", ts: Date.now()
+            });
+            multiGameId = newGame.id;
+            isPlayer1 = true;
+            listenToMultiGame(multiGameId);
+        }
+    } catch (e) {
+        alert("שגיאה בהתחברות לשרת המשחקים.");
+        window.cancelMultiplayer();
+    }
+};
+
+window.cancelMultiplayer = () => {
+    if(multiUnsub) multiUnsub();
+    if(multiGameId && isPlayer1) {
+        // אם פתחנו חדר והתחרטנו, נשנה את הסטטוס לבוטל
+        setDoc(doc(db, "games", multiGameId), { status: "cancelled" }, {merge: true});
+    }
+    document.getElementById('multi-lobby-ui').classList.add('hidden');
+    document.getElementById('math-menu').classList.remove('hidden');
+    multiGameId = null;
+};
+
+function listenToMultiGame(gId) {
+    if(multiUnsub) multiUnsub();
+    myMultiScore = 0;
+    
+    multiUnsub = onSnapshot(doc(db, "games", gId), (docSnap) => {
+        let data = docSnap.data();
+        if(!data) return;
+
+        // אם המשחק בוטל
+        if(data.status === "cancelled") {
+            alert("היריב עזב את החדר.");
+            window.cancelMultiplayer();
+            return;
+        }
+
+        // ברגע שהסטטוס משתנה ל-playing, מתחילים!
+        if(data.status === "playing" && document.getElementById('multi-active-game').classList.contains('hidden')) {
+            document.getElementById('multi-lobby-ui').classList.add('hidden');
+            document.getElementById('multi-active-game').classList.remove('hidden');
+            
+            // עדכון שמות השחקנים
+            document.getElementById('multi-p1-name').innerText = isPlayer1 ? (data.p1 + " (אתה)") : data.p1;
+            document.getElementById('multi-p2-name').innerText = !isPlayer1 ? (data.p2 + " (אתה)") : data.p2;
+            document.getElementById('multi-p1-score').innerText = "0";
+            document.getElementById('multi-p2-score').innerText = "0";
+            document.getElementById('multi-answer-input').value = '';
+            document.getElementById('multi-answer-input').focus();
+            
+            generateMultiQuestion();
+            
+            // שחקן 1 (המארח) אחראי על ניהול שעון המשחק בשרת
+            if (isPlayer1) {
+                let timeLeft = 60;
+                multiTimerInt = setInterval(() => {
+                    timeLeft--;
+                    setDoc(doc(db, "games", gId), { time: timeLeft }, {merge: true});
+                    if (timeLeft <= 0) {
+                        clearInterval(multiTimerInt);
+                        setDoc(doc(db, "games", gId), { status: "finished" }, {merge: true});
+                    }
+                }, 1000);
+            }
+        }
+
+        // סנכרון נתונים חיים (טיימר וניקוד)
+        if(data.status === "playing") {
+            if(data.time !== undefined) document.getElementById('multi-timer-ui').innerText = data.time;
+            document.getElementById('multi-p1-score').innerText = data.p1Score;
+            document.getElementById('multi-p2-score').innerText = data.p2Score;
+        }
+
+        // סיום המשחק
+        if(data.status === "finished") {
+            if(multiUnsub) multiUnsub();
+            if(multiTimerInt) clearInterval(multiTimerInt);
+            document.getElementById('multi-active-game').classList.add('hidden');
+            document.getElementById('math-menu').classList.remove('hidden');
+            
+            let won = (isPlayer1 && data.p1Score > data.p2Score) || (!isPlayer1 && data.p2Score > data.p1Score);
+            let tie = data.p1Score === data.p2Score;
+            
+            let msg = tie ? "תיקו! משחק צמוד." : won ? "ניצחת בדו-קרב! 🏆" : "הפסדת בקרב הפעם.";
+            
+            // נותנים נקודות XP על ההישג
+            let bonusXP = won ? 50 : tie ? 20 : 10; 
+            let totalEarned = myMultiScore + bonusXP;
+            
+            alert(`המשחק נגמר! ${msg}\nהרווחת ${totalEarned} XP!`);
+            
+            let currentXP = uData.xp || 0;
+            let currentDaily = uData.dailyPoints || 0;
+            setDoc(doc(db,"users",window.currentUser), {
+                xp: currentXP + totalEarned,
+                dailyPoints: currentDaily + totalEarned
+            }, {merge:true}).then(() => updateDailyUI());
+            
+            multiGameId = null;
+        }
+    });
+}
+
+function generateMultiQuestion() {
+    let isDiv = Math.random() > 0.5;
+    let a = Math.floor(Math.random() * 10) + 1;
+    let b = Math.floor(Math.random() * 10) + 1;
+    if(isDiv) {
+        let c = a * b; multiExpectedAnswer = b;
+        document.getElementById('multi-question-ui').innerText = `${c} ÷ ${a}`;
+    } else {
+        multiExpectedAnswer = a * b;
+        document.getElementById('multi-question-ui').innerText = `${a} × ${b}`;
+    }
+}
+
+window.checkMultiAnswer = () => {
+    let inp = document.getElementById('multi-answer-input');
+    if(parseInt(inp.value) === multiExpectedAnswer) {
+        myMultiScore += 10;
+        inp.value = '';
+        generateMultiQuestion();
+        
+        // עדכון השרת בנקודות שלך
+        if (isPlayer1) {
+            setDoc(doc(db, "games", multiGameId), { p1Score: myMultiScore }, {merge: true});
+        } else {
+            setDoc(doc(db, "games", multiGameId), { p2Score: myMultiScore }, {merge: true});
+        }
+    }
 };
 
 function generateMathQuestion() {
