@@ -126,7 +126,69 @@
         <!-- ================= HISTORY & ARENA & DIARY ================= -->
         <div id="history-page" class="hidden fade-in dark-card rounded-3xl p-6 border"><h2 class="text-3xl font-bold mb-6 text-brand-700">היסטוריית תחקירים</h2><div class="overflow-x-auto"><table class="w-full text-right"><thead class="border-b-2 border-gray-200 bg-gray-50"><tr><th class="p-3">תאריך</th><th class="p-3">מועד</th><th class="p-3 text-center">ציון</th><th class="p-3 text-center">פעולות</th></tr></thead><tbody id="history-tbody" class="divide-y"></tbody></table></div></div>
         
-        <div id="arena-page" class="hidden fade-in dark-card rounded-3xl p-6 border"><div class="text-center mb-8"><h2 class="text-4xl font-black mb-2"><i class="fa-solid fa-trophy text-yellow-400"></i> זירה חברתית ארצית</h2></div><div class="overflow-x-auto bg-gray-50 rounded-2xl border p-2"><table class="w-full text-right"><thead class="border-b text-gray-500"><tr><th class="pb-3 px-4">דירוג</th><th class="pb-3 px-4 font-bold text-black">משתמש</th><th class="pb-3 px-4 text-center font-bold text-black">ממוצע</th><th class="pb-3 px-4 text-center">שיא</th></tr></thead><tbody id="arena-tbody" class="divide-y"></tbody></table></div></div>
+        <!-- ================= ARENA & GAMES ================= -->
+<div id="arena-page" class="hidden fade-in dark-card rounded-3xl p-6 border shadow-sm">
+    <div class="text-center mb-6">
+        <h2 class="text-4xl font-black mb-2"><i class="fa-solid fa-trophy text-yellow-400"></i> זירת אלופים ואימונים</h2>
+    </div>
+
+    <!-- כרטיסיות ניווט פנימיות בזירה -->
+    <div class="flex border-b mb-6">
+        <button onclick="window.switchArenaTab('leaderboard')" id="tab-arena-lead" class="flex-1 py-3 text-lg transition tab-active whitespace-nowrap"><i class="fa-solid fa-list-ol ml-1"></i> דירוג ארצי</button>
+        <button onclick="window.switchArenaTab('games')" id="tab-arena-games" class="flex-1 py-3 text-lg transition tab-inactive whitespace-nowrap"><i class="fa-solid fa-gamepad ml-1"></i> משחקים ותרגולים</button>
+    </div>
+
+    <!-- אזור 1: טבלת הלידרבורד -->
+    <div id="arena-leaderboard-view">
+        <p class="text-gray-500 mb-4 text-center">הדירוג משוקלל לפי ממוצע הציונים שלך בתוספת נקודות הניסיון (XP) שצברת במשחקים.</p>
+        <div class="overflow-x-auto bg-gray-50 dark:bg-gray-800 rounded-2xl border p-2">
+            <table class="w-full text-right">
+                <thead class="border-b text-gray-500"><tr><th class="pb-3 px-4">דירוג</th><th class="pb-3 px-4 font-bold text-black dark:text-white">משתמש</th><th class="pb-3 px-4 text-center font-bold text-black dark:text-white">ניקוד משוקלל</th><th class="pb-3 px-4 text-center">XP ממשחקים</th></tr></thead>
+                <tbody id="arena-tbody" class="divide-y"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- אזור 2: אזור המשחקים -->
+    <div id="arena-games-view" class="hidden">
+        
+        <!-- תפריט ראשי למשחק -->
+        <div id="math-menu" class="text-center max-w-lg mx-auto">
+            <h3 class="text-3xl font-black text-brand-700 dark:text-brand-400 mb-2">אתגר כפל וחילוק (1-10)</h3>
+            <p class="text-gray-500 mb-6">צבור נקודות, השג את היעד היומי ועלה בדירוג הארצי!</p>
+            
+            <div class="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl border border-brand-200 shadow-sm mb-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-2 h-full bg-brand-500"></div>
+                <h4 class="font-bold text-lg mb-2">יעד יומי אישי</h4>
+                <div class="flex justify-between font-medium text-brand-800 dark:text-brand-300 mb-2">
+                    <span><i class="fa-solid fa-star text-yellow-400"></i> <span id="math-daily-points">0</span> נקודות</span>
+                    <span>100</span>
+                </div>
+                <div class="progress-bg"><div id="math-daily-prog" class="progress-fill bg-yellow-400" style="width:0%"></div></div>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <button onclick="window.startMathGame('solo')" class="bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl text-xl transition shadow-md"><i class="fa-solid fa-user ml-2"></i> שחק לבד (60 שניות)</button>
+                <button onclick="window.showMultiplayerLobby()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl text-xl transition shadow-md"><i class="fa-solid fa-user-group ml-2"></i> קרב לייב מול חבר</button>
+            </div>
+        </div>
+
+        <!-- אזור משחק פעיל -->
+        <div id="math-active-game" class="hidden text-center max-w-md mx-auto bg-gray-50 dark:bg-gray-800 p-8 rounded-3xl border shadow-lg">
+            <div class="flex justify-between items-center mb-8 border-b pb-4">
+                <div class="text-2xl font-bold text-red-500"><i class="fa-solid fa-clock"></i> <span id="math-timer-ui">60</span>s</div>
+                <div class="text-2xl font-black text-brand-600"><span id="math-score-ui">0</span> <span class="text-sm">XP</span></div>
+            </div>
+            
+            <div class="text-7xl font-black mb-8 text-gray-800 dark:text-white" style="direction: ltr;" id="math-question-ui">?</div>
+            
+            <input type="number" id="math-answer-input" placeholder="הקלד תשובה..." class="w-full text-center text-4xl p-4 border-4 border-brand-200 rounded-2xl mb-4 focus:border-brand-500 outline-none dark-card" oninput="window.checkMathAnswer()" style="direction: ltr;">
+            
+            <button onclick="window.endMathGame()" class="text-gray-400 hover:text-red-500 font-bold mt-4 transition">סיים משחק מוקדם</button>
+        </div>
+
+    </div>
+</div>
         
         <div id="diary-page" class="hidden fade-in dark-card rounded-3xl p-6 border"><h2 class="text-3xl font-bold mb-6 text-purple-700"><i class="fa-solid fa-book-open"></i> יומן טעויות נפוצות</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="p-6 border rounded-2xl bg-green-50/50"><h3 class="font-bold text-green-800 text-xl mb-4 border-b border-green-200 pb-2">הנושאים החזקים שלי</h3><ul id="diary-strong" class="space-y-3 font-medium"></ul></div><div class="p-6 border rounded-2xl bg-red-50/50"><h3 class="font-bold text-red-800 text-xl mb-4 border-b border-red-200 pb-2">דורש חיזוק</h3><ul id="diary-weak" class="space-y-3 font-medium"></ul></div></div></div>
 
